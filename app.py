@@ -4,6 +4,7 @@ RunLog — дневник тренировок для бега.
 Запуск: python app.py
 Затем открыть на телефоне (в той же Wi-Fi сети): http://<IP-компьютера>:5000
 """
+import os
 import json
 from datetime import datetime, date
 
@@ -13,7 +14,12 @@ from plan_generator import generate_plan, WORKOUT_TYPES
 from gpx_import import parse_track_file
 
 app = Flask(__name__)
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///runlog.db"
+
+# Настройка базы данных
+if not os.path.exists('instance'):
+    os.makedirs('instance')
+
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///instance/runlog.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SECRET_KEY"] = "runlog-secret-key-change-me"
 
@@ -52,7 +58,6 @@ def index():
         .all()
     )
 
-    # статистика за последние 7 и 30 дней
     from datetime import timedelta
     week_ago = today - timedelta(days=7)
     month_ago = today - timedelta(days=30)
@@ -271,7 +276,6 @@ def tracker():
 
 @app.route("/tracker/import", methods=["GET", "POST"])
 def tracker_import():
-    """Импорт трека, записанного смарт-часами (GPX/TCX), как результат тренировки."""
     open_plan_workouts = (
         PlanWorkout.query.filter(PlanWorkout.is_done == False, PlanWorkout.workout_type != "rest")
         .order_by(PlanWorkout.workout_date.asc())
@@ -325,7 +329,6 @@ def tracker_import():
 
 @app.route("/api/tracker/save", methods=["POST"])
 def tracker_save():
-    """Принимает записанный GPS-трек с телефона и сохраняет как результат тренировки."""
     data = request.get_json(force=True)
 
     points = data.get("points", [])
@@ -342,7 +345,7 @@ def tracker_save():
         notes=data.get("notes", ""),
     )
     db.session.add(result)
-    db.session.flush()  # получить result.id до commit
+    db.session.flush()
 
     track = GpsTrack(result_id=result.id, points_json=json.dumps(points))
     db.session.add(track)
@@ -365,7 +368,6 @@ def stats():
     total_runs = len(results)
     total_sec = sum(r.duration_sec for r in results)
 
-    # данные для графика по неделям (последние 12 недель)
     from collections import defaultdict
     from datetime import timedelta
     weekly = defaultdict(float)
@@ -399,5 +401,8 @@ def service_worker():
     return app.send_static_file("service-worker.js")
 
 
+# ---------- Запуск ----------
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
