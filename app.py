@@ -7,19 +7,20 @@ RunLog — дневник тренировок для бега.
 import os
 import json
 from datetime import datetime, date
+from pathlib import Path
 
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
 from models import db, Race, PlanWorkout, WorkoutResult, GpsTrack
 from plan_generator import generate_plan, WORKOUT_TYPES
 from gpx_import import parse_track_file
-
 app = Flask(__name__)
 
 # Настройка базы данных
 if not os.path.exists('instance'):
     os.makedirs('instance')
 
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///instance/runlog.db"
+db_path = os.path.join('/tmp', 'runlog.db')
+app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SECRET_KEY"] = "runlog-secret-key-change-me"
 
